@@ -175,12 +175,12 @@ class Speed():
 class Display():
     """Output information on SSd1306 oled display"""
 
-    # font created by: 
+    # font created by:
     # ../micropython-font-to-py/font_to_py.py \
     #   /usr/share/fonts/google-droid/DroidSans.ttf \
     #   -x 20 droidsans20.py -c 0123456789,.kmhrpm/
     import droidsans20
-    # font created by: 
+    # font created by:
     # ../micropython-font-to-py/font_to_py.py \
     #   /usr/share/fonts/google-droid/DroidSans.ttf
     #   -x 48 droidsans48.py 0123456789,. 
@@ -430,38 +430,38 @@ def show():
     i = 0
     while True:
         i += 1
-        mode = limiter.mode()
+        mode = limiter.get_mode()
 
         button_presses = button.pressed()
         if button_presses > 0:
-            display.speed(button_presses)
+            # display.speed(button_presses)
             # flash the button presses
             utime.sleep_ms(500)
 
-        rpm = rpm.avg()
+        rpm_avg = rpm.avg()
 
         kmh = speed.get_avg()
 
         if (mode != limiter.UNLIMITED and
-                rpm < limiter.LIMIT_RPM_LOW and
+                rpm_avg < limiter.LIMIT_RPM_LOW and
                 kmh < limiter.LIMIT_SPEED_LOW):
                 # we were restricted, but now are free to go
             limiter.free()
 
         elif (mode != limiter.LIMP and
-              (rpm > limiter.LIMP_RPM_HIGH or
+              (rpm_avg > limiter.LIMP_RPM_HIGH or
                kmh > limiter.LIMP_SPEED_HIGH)):
                 # we were not limping, but are now above limp
             limiter.limp()
 
         if (mode == limiter.UNLIMITED and
-                (rpm > limiter.LIMIT_RPM_HIGH or
+                (rpm_avg > limiter.LIMIT_RPM_HIGH or
                  kmh > limiter.LIMIT_SPEED_HIGH)):
                 # we were unrestricted, but now are above limit
             limiter.limit()
 
         elif (mode == limiter.LIMP and
-              rpm < limiter.LIMP_RPM_LOW and
+              rpm_avg < limiter.LIMP_RPM_LOW and
               kmh < limiter.LIMP_SPEED_LOW):
                 # we were limping, but are now below LOW
             limiter.limit()
@@ -471,9 +471,11 @@ def show():
         # in middle of polling button clicks to get fast interaction.
         # In such case we don't update display every round.
         if button.main_loop_sleep == button.NORMAL_SLEEP:
-            display.rpm_speed(rpm, kmh)
+            display.rpm_speed(rpm_avg, kmh)
+            print("rpm: ", rpm_avg, " kmh: ", kmh)
         elif i % (button.NORMAL_SLEEP // button.BUTTON_CHECK_SLEEP) == 0:
-            display.rpm_speed(rpm, kmh)
+            print("rpm: ", rpm_avg, " kmh: ", kmh)
+            display.rpm_speed(rpm_avg, kmh)
 
         utime.sleep_ms(button.main_loop_sleep)
 
