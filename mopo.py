@@ -1,10 +1,12 @@
-""" module to measure rpm """
+""" module to implement moped computer """
 
 import array
 import machine
 import micropython
 import utime
 from writer_minimal import Writer
+import gc
+
 
 # emergency buffer for errors in interrupt handler
 micropython.alloc_emergency_exception_buf(100)
@@ -175,18 +177,6 @@ class Speed():
 class Display():
     """Output information on SSd1306 oled display"""
 
-    # font created by:
-    # ../micropython-font-to-py/font_to_py.py \
-    #   /usr/share/fonts/google-droid/DroidSans.ttf \
-    #   -x 20 droidsans20.py -c 0123456789,.kmhrpm/
-    import droidsans20
-    # font created by:
-    # ../micropython-font-to-py/font_to_py.py \
-    #   /usr/share/fonts/google-droid/DroidSans.ttf
-    #   -x 48 droidsans48.py 0123456789,. 
-    import droidsans48
-    import ssd1306
-
     # define how SSD1306 display is connected
     PIN_SDA = 4
     PIN_SCL = 5
@@ -195,6 +185,19 @@ class Display():
     I2C_ADDRESS = 0x3c
 
     def __init__(self, scl_pin=None, sda_pin=None):
+        # font created by:
+        # ../micropython-font-to-py/font_to_py.py \
+        #   /usr/share/fonts/google-droid/DroidSans.ttf \
+        #   -x 20 droidsans20.py -c 0123456789,.kmhrpm/
+        import droidsans20
+        # font created by:
+        # ../micropython-font-to-py/font_to_py.py \
+        #   /usr/share/fonts/google-droid/DroidSans.ttf
+        #   -x 48 droidsans48.py 0123456789,.
+        # import droidsans48
+        # import droidsans32
+        import ssd1306
+
         if scl_pin is None:
             scl_pin = self.PIN_SCL
         if sda_pin is None:
@@ -204,7 +207,9 @@ class Display():
                         self.PIXEL_WIDTH, self.PIXEL_HEIGHT,
                         self.i2c, self.I2C_ADDRESS)
         self.font_small = Writer(self.oled, droidsans20)
-        self.font_big = Writer(self.oled, droidsans48)
+        # self.font_big = Writer(self.oled, droidsans48)
+        # self.font_big = Writer(self.oled, droidsans32)
+        # self.font_big = self.font_small
 
     def rpm_speed(self, rpm, speed):
         """Draw rpm and speed screen"""
@@ -219,25 +224,27 @@ class Display():
         self.font_small.printstring(str(tmp) + " km/h")
         self.oled.show()
 
-    def rpm(self, rpm):
-        """Draw RPM screen"""
-        self.oled.fill(0)
-        font_width = 31
+    #  def rpm(self, rpm):
+    #      """Draw RPM screen"""
+    #      self.oled.fill(0)
+    #      font_width = 31
 
-        self.oled.fill(0)
-        if rpm < 10:
-            pos = (124 - 1.2*font_width)//2
-        else:
-            pos = 124//2 - 1.2*font_width
+    #      self.oled.fill(0)
+    #      if rpm < 10:
+    #          pos = (124 - 1.2*font_width)//2
+    #      else:
+    #          pos = 124//2 - 1.2*font_width
 
-        self.font_big.set_textpos(3, int(pos))
+    #      # self.font_big.set_textpos(3, int(pos))
+    #      self.font_small.set_textpos(3, int(pos))
 
-        # self.font_big.set_textpos(3, 20)
+    #      # self.font_big.set_textpos(3, 20)
 
-        # we use tmp to get one digit accuracy for rpms, e.g 5323 is 5.3
-        tmp = int(rpm/100)
-        self.font_big.printstring(str(tmp/10))
-        self.oled.show()
+    #      # we use tmp to get one digit accuracy for rpms, e.g 5323 is 5.3
+    #      tmp = int(rpm/100)
+    #      # self.font_big.printstring(str(tmp/10))
+    #      self.font_small.printstring(str(tmp/10))
+    #      self.oled.show()
 
     def speed(self, speed):
         """Draw Speed screen"""
@@ -249,20 +256,22 @@ class Display():
         else:
             pos = 124//2 - font_width
 
-        self.font_big.set_textpos(3, pos)
-        self.font_big.printstring(str(speed))
+        # self.font_big.set_textpos(3, pos)
+        self.font_small.set_textpos(3, pos)
+        # self.font_big.printstring(str(speed))
+        self.font_small.printstring(str(speed))
         self.oled.show()
 
-    def dist(self, trip, total):
-        """Draw ODO screen"""
-        self.oled.fill(0)
+    #  def dist(self, trip, total):
+    #      """Draw ODO screen"""
+    #      self.oled.fill(0)
 
-        self.font_small.set_textpos(10, 30)
-        self.font_small.printstring(str(trip) + " km")
+    #      self.font_small.set_textpos(10, 30)
+    #      self.font_small.printstring(str(trip) + " km")
 
-        self.font_small.set_textpos(40, 30)
-        self.font_small.printstring(str(total) + " km")
-        self.oled.show()
+    #      self.font_small.set_textpos(40, 30)
+    #      self.font_small.printstring(str(total) + " km")
+    #      self.oled.show()
 
 
 class Button():
@@ -277,6 +286,7 @@ class Button():
     BUTTON_UP = 1
 
     def __init__(self, pin=2):
+        # By defualt button pin is GPIO2 (D4)
         self.button = machine.Pin(pin, machine.Pin.IN, machine.Pin.PULL_UP)
         self.main_loop_sleep = self.NORMAL_SLEEP
         self.button_press_time_ms = 0
@@ -286,6 +296,7 @@ class Button():
         self.button_waiting_more_clicks = False
         self.button_series_click_timer = machine.Timer(-1)
         self.button_series_click_prev_value = 0
+        self.button.irq(trigger=machine.Pin.IRQ_FALLING, handler=self.cb_button)
 
 
     def cb_button_series(self, timer):
@@ -346,12 +357,13 @@ class Button():
         """Tell how many times button has been pressed. If currently
            waiting for the series of presses, return -1."""
         irq_state = machine.disable_irq()
-        pressed = self.button_press_count
-        waiting = self.button_waiting_more_clicks
+        if self.button_waiting_more_clicks:
+            pressed = -1
+        else:
+            pressed = self.button_press_count
+            self.button_press_count = 0
         machine.enable_irq(irq_state)
 
-        if waiting:
-            pressed = -1
         return pressed
 
 class Limiter():
@@ -420,21 +432,31 @@ class Limiter():
 
 def show():
     """We keep looping here forever"""
+    gc.collect()
 
+    print("mem1: ", gc.mem_alloc()) 
     rpm = Rpm(12)
+    print("mem2: ", gc.mem_alloc()) 
     display = Display()
+    print("mem3: ", gc.mem_alloc()) 
     speed = Speed(hall_tick_dist_mm=298)
+    print("mem4: ", gc.mem_alloc()) 
     button = Button()
+    print("mem5: ", gc.mem_alloc()) 
     limiter = Limiter()
 
     i = 0
     while True:
         i += 1
+        print("mem ", i, ": ", gc.mem_alloc(), " free: ", gc.mem_free()) 
         mode = limiter.get_mode()
 
         button_presses = button.pressed()
+        print("button presses: ", button_presses)
         if button_presses > 0:
-            # display.speed(button_presses)
+            display.speed(button_presses)
+            # display.rpm_speed(button_presses*1000, button_presses)
+            print("button presses: ", button_presses)
             # flash the button presses
             utime.sleep_ms(500)
 
